@@ -161,7 +161,7 @@ ol.top{border-radius:10px}
       <li>Saute par-dessus les obstacles et les précipices.</li>
       <li>Ça se corse peu à peu : nouveaux obstacles au fil des mètres, et le rocher accélère tous les 1000 m.</li>
       <li>Traverse les chalets en bois ou saute sur leur toit. Le rocher les écrase !</li>
-      <li>Très rare : au bout de la terrasse du grand chalet, l'écusson au renard te transforme en renard à cape. Tu cours 2 fois plus vite et tu sautes 2 fois plus haut. Tant que tu es renard, rien ne remplace ce pouvoir (ni cheval, ni charrette, ni dragon). Tu le perds si tu tombes.</li>
+      <li>Très rare : au bout de la terrasse du grand chalet, l'écusson au renard te transforme en renard à cape. Tu cours 2 fois plus vite, tu sautes 2 fois plus haut et tu es invincible : tu fonces à travers les obstacles et tu passes au-dessus des précipices. Le pouvoir dure 15 secondes. Tant que tu es renard, rien ne remplace ce pouvoir (ni cheval, ni charrette, ni dragon).</li>
       <li>Saute sur un cheval sauvage pour galoper. Il saute aussi, mais un obstacle te fait tomber !</li>
       <li>Saute dans une charrette : elle file plus vite que le cheval et peut sauter une fois, mais elle se casse au premier obstacle. Seul l'écusson au renard peut la remplacer.</li>
       <li>Attrape un dragon pour voler. Touche l'écran pour battre des ailes et évite les oiseaux !</li>
@@ -867,6 +867,8 @@ function genCoins(upTo){
     for(i=0;i<hs.length;i++)coins.push({x:bx+i*16,h:hs[i]});
     var b2=bx+215+(hv>>>16)%60;
     for(i=0;i<3;i++)coins.push({x:b2+i*16,h:6});
+    /* a second sky row, drawn independently: twice as many coins out of reach without the fox or the dragon */
+    if((hv>>>20)%25<6)for(i=0;i<7;i++)coins.push({x:b2-40+i*16,h:88});
   }
 }
 function reset(){
@@ -1095,6 +1097,8 @@ function update(dt){
   else P.v=Math.max(target,P.v-(P.mode==='fallen'?700:70)*dt);
   P.x+=P.v*dt;
   if(P.inv>0)P.inv-=dt;
+  /* the fox lasts 15 seconds, then the hero is back on his feet with a short grace period */
+  if(P.boots){P.bootT=(P.bootT||15)-dt;if(P.bootT<=0){loseBoots();P.inv=Math.max(P.inv,.8);sfx('flap');}}
   if(P.bolt>0)P.bolt-=dt;
   if(P.wig>0)P.wig-=dt;
   if(P.sj>0)P.sj-=dt;
@@ -1196,7 +1200,7 @@ function update(dt){
   if(ahead>nextA){
     if(P.mode==='fly'){
       ents.push({type:'bird',x:nextA,h:FLOOR-8+Math.random()*(CEIL-FLOOR+4),ph:Math.random()*6});
-      nextA+=1.333*(60+Math.random()*90+P.v*.25)*Math.max(.45,Math.min(1,66/(CEIL-FLOOR)));
+      nextA+=2.667*(60+Math.random()*90+P.v*.25)*Math.max(.45,Math.min(1,66/(CEIL-FLOOR)));
     }else{
       var bh=27+Math.random()*7;
       ents.push({type:'dragon',x:nextA,bh:bh,h:bh,ph:Math.random()*6});
@@ -1231,7 +1235,7 @@ function update(dt){
         else if(P.mode==='fly'){ents.push({type:'away',x:P.x,h:P.h-9});P.mode='jump';P.vy=0;P.dj=0;nextA=P.x+350+Math.random()*300;}
         else if(P.mode==='fallen'||P.mode==='tumble'){P.mode='run';P.tm=0;}
         P.fox=0;P.bolt=0;P.kick=0;P.inv=Math.max(P.inv,.4);
-        e.dead=true;P.boots=true;P.bolt=.45;P.bseed=1+Math.floor(Math.random()*9999);shake=.3;sfx('ride');say('RENARD !',1);
+        e.dead=true;P.boots=true;P.bootT=15;P.bolt=.45;P.bseed=1+Math.floor(Math.random()*9999);shake=.3;sfx('ride');say('RENARD !',1);
         burst(e.x,e.h+4,14,['#ff8a1f','#ffd23f','#ffffff'],130);
       }
       continue;
@@ -1241,12 +1245,12 @@ function update(dt){
     dx=e.x-P.x;
     if(e.type==='ob'){
       o=OB[e.k];
-      if(P.fox>0){if(Math.abs(dx)<o.w/2+6&&P.h<o.hh){e.dead=true;burst(e.x,4,8,['#8d8d9c','#a0714a','#4fa83d'],120);sfx('flap');}}
+      if(P.fox>0||P.boots){if(Math.abs(dx)<o.w/2+6&&P.h<o.hh){e.dead=true;burst(e.x,4,8,['#8d8d9c','#a0714a','#4fa83d'],120);sfx('flap');}}
       else if(Math.abs(dx)<o.w/2+2&&P.h<o.hh-2&&P.inv<=0&&!e.hit&&(P.mode==='run'||P.mode==='jump'||riding())){e.hit=true;if(inCart())breakCart();else stumble();}
     }else if(e.type==='cart'){
       if(P.mode==='jump'&&!P.boots&&Math.abs(dx)<13&&P.h<15){e.dead=true;P.mode='cart';P.h=0;P.vy=0;sfx('ride');say('EN VOITURE !',.9);}
     }else if(e.type==='pit'){
-      if((P.mode==='run'||P.mode==='horse'||P.mode==='cart')&&P.h<=0&&Math.abs(dx)<e.w/2-3&&P.inv<=0&&P.fox<=0){stumble();P.mode='abyss';P.tm=.75;P.v=0;P.vy=40;P.pit=1;P.px=e.x+e.w/2+5;P.x=Math.max(e.x-e.w/2+6,Math.min(e.x+e.w/2-6,P.x+4));say('OUPS !',.8);}
+      if((P.mode==='run'||P.mode==='horse'||P.mode==='cart')&&P.h<=0&&Math.abs(dx)<e.w/2-3&&P.inv<=0&&P.fox<=0&&!P.boots){stumble();P.mode='abyss';P.tm=.75;P.v=0;P.vy=40;P.pit=1;P.px=e.x+e.w/2+5;P.x=Math.max(e.x-e.w/2+6,Math.min(e.x+e.w/2-6,P.x+4));say('OUPS !',.8);}
     }else if(e.type==='horse'){
       if(P.mode==='jump'&&P.fox<=0&&!P.boots&&Math.abs(dx)<14&&P.h<16){e.dead=true;P.mode='horse';P.h=0;P.vy=0;sfx('ride');say('AU GALOP !',.9);}
     }else if(e.type==='dragon'){
@@ -1706,7 +1710,7 @@ function draw(){
   }
   /* player */
   var C=CH[sel],foxed=P.boots&&(P.mode==='run'||P.mode==='jump');
-  var blink=P.dead||((P.inv>0||(P.fox>0&&P.fox<1))&&Math.floor(t*18)%2);
+  var blink=P.dead||((P.inv>0||(P.fox>0&&P.fox<1)||(P.boots&&P.bootT<1))&&Math.floor(t*18)%2);
   if(!blink){
     var py=GY-P.h;
     if(P.mode==='fly'){
@@ -2123,7 +2127,7 @@ try{$('cnic').src=coinIcon();}catch(e){}
   it.addEventListener('pointerdown',function(e){e.preventDefault();e.stopPropagation();done();},true);
   flyT=setTimeout(fly,2600);
 })();
-window.__g={crest:function(){P.boots=true;},quiet:function(){nextA=1e9;nextG=1e9;ents=ents.filter(function(e){return e.type==='chalet'||e.type==='boots';});},ents:function(){return ents;},chalet:function(k){return spawnChalet(k,P.x+120);},bonus:function(){startBonus();},pick:pick,CH:CH,sHorse:sHorse,sFox:sFox,update:update,tap:tap,start:start,draw:draw,state:function(){return {coins:coinN,st:st,P:P,rock:rock,n:ents.length};}};
+window.__g={crest:function(){P.boots=true;P.bootT=15;},quiet:function(){nextA=1e9;nextG=1e9;ents=ents.filter(function(e){return e.type==='chalet'||e.type==='boots';});},ents:function(){return ents;},chalet:function(k){return spawnChalet(k,P.x+120);},bonus:function(){startBonus();},pick:pick,CH:CH,sHorse:sHorse,sFox:sFox,update:update,tap:tap,start:start,draw:draw,state:function(){return {coins:coinN,st:st,P:P,rock:rock,n:ents.length};}};
 requestAnimationFrame(frame);
 })();
 </script>
