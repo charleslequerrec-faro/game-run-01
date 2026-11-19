@@ -13,6 +13,21 @@
 *{box-sizing:border-box}
 html,body{font-synthesis:none;-webkit-font-smoothing:none;margin:0;height:100%;background:#0b0716;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;font-family:"Jersey 15","Courier New",Courier,monospace;-webkit-tap-highlight-color:transparent;color:#f4ecd8}
 /* the game always plays in a portrait frame: full screen on phones, a centred 9:16 column on wider screens */
+/* desktop only: vintage CRT monitor around the game column (sized in fitStage) */
+#bezel{display:none;position:fixed;left:50%;transform:translateX(-50%);border-radius:34px;
+  background:linear-gradient(165deg,#5b4f45 0%,#3a3029 45%,#251e1a 100%);
+  box-shadow:0 24px 70px rgba(0,0,0,.75),inset 0 2px 0 rgba(255,255,255,.14),inset 0 -4px 0 rgba(0,0,0,.45),inset 3px 0 0 rgba(255,255,255,.05)}
+#bezel .lbl{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;gap:14px;
+  font:bold 13px "Jersey 15","Courier New",monospace;letter-spacing:4px;color:#8f8273;text-shadow:0 1px 0 rgba(0,0,0,.6),0 -1px 0 rgba(255,255,255,.08)}
+#bezel .led{width:8px;height:8px;border-radius:50%;background:#6dff7a;box-shadow:0 0 6px #6dff7a,0 0 14px rgba(109,255,122,.6)}
+#bezel .knob{width:14px;height:14px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#6b5f55,#2a221d);box-shadow:0 1px 2px rgba(0,0,0,.7)}
+body.crt #stage{border-radius:20px/24px;box-shadow:0 0 0 5px #0c090b,0 0 0 8px #463b32,0 0 0 9px #1a1411}
+#crt{display:none;position:absolute;left:0;top:0;right:0;bottom:0;pointer-events:none;z-index:999;border-radius:inherit;
+  background:repeating-linear-gradient(to bottom,rgba(0,0,0,.10) 0,rgba(0,0,0,.10) 1px,transparent 1px,transparent 3px),
+    radial-gradient(ellipse at center,rgba(0,0,0,0) 58%,rgba(0,0,0,.38) 100%),
+    linear-gradient(135deg,rgba(255,255,255,.07) 0%,rgba(255,255,255,0) 35%);
+  box-shadow:inset 0 0 40px rgba(0,0,0,.55)}
+body.crt #crt,body.crt #bezel{display:block}
 #stage{position:fixed;top:0;left:50%;transform:translateX(-50%);height:100vh;height:100dvh;width:100vw;max-width:56.25vh;max-width:56.25dvh;overflow:hidden;background:#1b1430;box-shadow:0 0 0 2px #000,0 0 60px rgba(0,0,0,.6)}
 #c{position:absolute;left:0;top:0;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges;display:block}
 #hud{position:absolute;left:0;right:0;top:0;padding:calc(env(safe-area-inset-top) + 10px) calc(env(safe-area-inset-right) + 12px) 0 calc(env(safe-area-inset-left) + 12px);display:none;align-items:center;gap:10px;pointer-events:none;font-weight:bold;text-shadow:2px 2px 0 #2b1b2e}
@@ -93,7 +108,9 @@ ol.top{border-radius:10px}
 </style>
 </head>
 <body>
+<div id="bezel" aria-hidden="true"><div class="lbl"><span class="knob"></span>FAST FOX<span class="led"></span><span class="knob"></span></div></div>
 <div id="stage">
+<div id="crt" aria-hidden="true"></div>
 <canvas id="c"></canvas>
 <div id="hud">
   <div id="dl"><div id="dist">0 m</div><div id="coinc"><i></i><span id="cn">0</span></div></div>
@@ -1890,7 +1907,18 @@ function fitStage(){
   /* while typing, keep the height measured before the keyboard came up (unless the device was rotated) */
   if(!typing()||!baseH||w!==baseW){baseH=h;baseW=w;}
   stg.style.maxWidth='none';
-  stg.style.width=Math.min(w,Math.round(Math.max(h,baseH)*9/16))+'px';
+  var hh=Math.max(h,baseH),B=Math.max(22,Math.round(hh*.035)),C=Math.round(B*1.9),
+      sh=hh-B-C,sw=Math.round(sh*9/16),bz=$('bezel');
+  /* room for the monitor on both sides (desktop): framed screen; otherwise full height as before */
+  if(w>=sw+2*B+120&&hh>=480){
+    document.body.classList.add('crt');
+    stg.style.top=B+'px';stg.style.height=sh+'px';stg.style.width=sw+'px';
+    if(bz){bz.style.top='0px';bz.style.height=hh+'px';bz.style.width=(sw+2*B)+'px';bz.querySelector('.lbl').style.height=C+'px';}
+  }else{
+    document.body.classList.remove('crt');
+    stg.style.top='';stg.style.height='';
+    stg.style.width=Math.min(w,Math.round(hh*9/16))+'px';
+  }
 }
 function onResize(){
   fitStage();
