@@ -118,6 +118,8 @@ input{border-radius:10px}
 #chars button{border-radius:10px}
 ol.top{border-radius:10px}
 #gapb{border-radius:8px;overflow:hidden}
+/* confetti when the score enters the leaderboard: a chunky pixel layer above the end screen, below the scanlines */
+#fx{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:60;display:none;image-rendering:pixelated;image-rendering:crisp-edges}
 </style>
 </head>
 <body>
@@ -125,6 +127,7 @@ ol.top{border-radius:10px}
 <div id="stage">
 <div id="crt" aria-hidden="true"></div>
 <canvas id="c"></canvas>
+<canvas id="fx" aria-hidden="true"></canvas>
 <div id="hud">
   <div class="hrow">
     <div id="gapw" class="chip" aria-label="Distance du rocher"><img id="rkic" alt=""><div id="gapb"><i id="gapf"></i></div></div>
@@ -1850,6 +1853,50 @@ function scrollMe(el){
   el.scrollTop=0;
   var me2=el.querySelector('li.me');if(me2)el.scrollTop=Math.max(0,me2.offsetTop-el.clientHeight/2);
 }
+/* ---------- confetti ---------- */
+/* fired when the new score makes the top 20: two bursts from the bottom corners, then a light shower from the top */
+var fxc=null,fxx=null,fxp=[],fxRaf=0,fxLast=0,fxRain=0;
+var FXCOL=['#f2c230','#ffd23f','#d83a2e','#ff5fa8','#3b6fd0','#4fa83d','#8fd45a','#f4ecd8','#e8792b'];
+function confetti(){
+  try{if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;}catch(e){}
+  fxc=fxc||$('fx');if(!fxc)return;fxx=fxx||fxc.getContext('2d');
+  var stg=$('stage'),fw=180,fh=Math.round(fw*((stg.clientHeight||640)/(stg.clientWidth||360)));
+  fxc.width=fw;fxc.height=fh;fxx.imageSmoothingEnabled=false;
+  fxp=[];
+  var i,side,a,sp;
+  for(i=0;i<140;i++){
+    side=i%2;a=(side?-1:1)*(.35+Math.random()*.55);sp=150+Math.random()*130;
+    fxp.push(piece(side?fw+2:-2,fh*.78,Math.sin(a)*sp,-Math.cos(a)*sp,i*.004));
+  }
+  fxRain=1.6;fxc.style.display='block';
+  if(!fxRaf){fxLast=0;fxRaf=requestAnimationFrame(fxFrame);}
+  sfx('coin');
+}
+function piece(x,y,vx,vy,delay){
+  return {x:x,y:y,vx:vx,vy:vy,w:3+(Math.random()*2|0),h:2+(Math.random()*2|0),c:FXCOL[Math.random()*FXCOL.length|0],
+    ph:Math.random()*6.3,sp:6+Math.random()*10,sw:Math.random()*6.3,wait:delay||0};
+}
+function fxFrame(ts){
+  var dt=fxLast?Math.min(.033,(ts-fxLast)/1000):.016;fxLast=ts;
+  var fw=fxc.width,fh=fxc.height,i,p,w;
+  if(fxRain>0){fxRain-=dt;if(Math.random()<dt*45)fxp.push(piece(Math.random()*fw,-3,(Math.random()-.5)*20,10+Math.random()*20,0));}
+  fxx.clearRect(0,0,fw,fh);
+  for(i=0;i<fxp.length;i++){
+    p=fxp[i];
+    if(p.wait>0){p.wait-=dt;continue;}
+    p.vy+=230*dt;p.vx*=(1-2.2*dt);if(p.vy>38)p.vy=38+(p.vy-38)*(1-4*dt);   /* paper: air drag caps the fall */
+    p.sw+=dt*3;p.x+=(p.vx+Math.sin(p.sw)*12)*dt;p.y+=p.vy*dt;p.ph+=p.sp*dt;
+    w=Math.round(p.w*Math.abs(Math.cos(p.ph)));if(w<1)w=1;            /* tumbling: the piece narrows as it turns */
+    fxx.globalAlpha=Math.cos(p.ph)<0?.6:1;                              /* back side of the paper a little darker */
+    fxx.fillStyle=p.c;fxx.fillRect(Math.round(p.x-w/2),Math.round(p.y),w,p.h);fxx.globalAlpha=1;
+  }
+  fxp=fxp.filter(function(p){return p.y<fh+4&&p.x>-20&&p.x<fw+20;});
+  if(fxp.length||fxRain>0)fxRaf=requestAnimationFrame(fxFrame);else stopConfetti();
+}
+function stopConfetti(){
+  if(fxRaf)cancelAnimationFrame(fxRaf);fxRaf=0;fxp=[];fxRain=0;
+  if(fxc){fxc.style.display='none';if(fxx)fxx.clearRect(0,0,fxc.width,fxc.height);}
+}
 /* crushed: the hero vanishes in a cloud of sparks, then the end screen comes up */
 var dieT=0;
 function die(){
@@ -1892,11 +1939,14 @@ function gameOver(){
   $('obrk').innerHTML=dm+' m + '+coinN+' <img class="cic" alt="'+(coinN>1?'pièces':'pièce')+'" src="'+coinIcon()+'"> × 10';
   $('orec').textContent=d>best?'Nouveau record !':'';
   showTop($('otop'),netTop||sc,netTop?null:me);
-  /* send the score; the shared top 5 replaces the list as soon as it comes back */
-  netPost(dm,coinN,sel,pname,function(top,id){
-    var mk=null;for(var q=0;q<top.length;q++)if(top[q].id===id)mk=top[q];
-    showTop($('otop'),top,mk);
-  });
+  /* shared leaderboard: confetti once the server says the score made the top 20; scores kept in this browser: right away */
+  if(SCORE_URL&&window.fetch){
+    netPost(dm,coinN,sel,pname,function(top,id){
+      var mk=null;for(var q=0;q<top.length;q++)if(top[q].id===id)mk=top[q];
+      showTop($('otop'),top,mk);
+      if(mk&&st==='over')confetti();
+    });
+  }else if(sc.indexOf(me)>=0)setTimeout(function(){if(st==='over')confetti();},450);
   $('hud').style.display='none';$('msg').style.display='none';
   /* back to the opening wide shot: castle standing, hero in front of it, boulder out of sight */
   reset();
@@ -1907,12 +1957,14 @@ function start(){
   var v=($('nm').value||'').replace(/\s+/g,' ').trim();
   pname=v||CH[sel].label;
   try{localStorage.setItem('tobias_name',pname);}catch(e){}
+  stopConfetti();
   st='play';reset();startMusic();
   $('menu').style.display='none';$('over').style.display='none';$('hud').style.display='flex';
   say('ATTENTION !',1.6);
   try{$('nm').blur();}catch(e){}
 }
 function menu(){
+  stopConfetti();
   st='menu';reset();
   $('over').style.display='none';$('hud').style.display='none';$('msg').style.display='none';
   showTop($('mtop'),netTop||loadScores(),null);
