@@ -21,6 +21,7 @@ ul.how{display:none}
 ul.how.open{display:block}
 #obrk{font-size:18px;font-weight:bold;color:#f4ecd8;margin:2px 0 2px}
 #gapw{flex:1;font-size:15px;letter-spacing:1px}
+#rkic{height:15px;width:16px;vertical-align:-2px;margin-right:4px;image-rendering:pixelated;image-rendering:crisp-edges}
 #gapb{height:12px;border:3px solid #2b1b2e;background:#f4ecd8;margin-top:2px}
 #gapf{display:block;height:100%;width:30%;background:#4fa83d}
 #snd{pointer-events:auto;width:40px;height:40px;border:3px solid #2b1b2e;background:#f2c230;color:#2b1b2e;font:bold 20px "Jersey 15","Courier New",monospace;padding:0}
@@ -53,6 +54,7 @@ h1{margin:-4px -8px 0}
 @media (prefers-reduced-motion:reduce){#intro .lg{animation:none}#intro .flash{display:none}}
 h1 img{width:320px;max-width:100%;height:auto;image-rendering:pixelated;image-rendering:crisp-edges}
 h2{margin:0 0 4px;font-size:28px;color:#f2c230;text-shadow:3px 3px 0 #d83a2e}
+.cic{height:1.05em;width:auto;vertical-align:-.15em;image-rendering:pixelated;image-rendering:crisp-edges}
 .sub{margin:8px 0 12px;font-size:19px;font-weight:bold;color:#f4ecd8}
 label{display:block;font-size:18px;font-weight:bold;margin-bottom:5px;text-align:left}
 input{width:100%;font:bold 24px "Jersey 15","Courier New",monospace;padding:9px 10px;border:3px solid #f4ecd8;background:#f4ecd8;color:#2b1b2e;border-radius:0;-webkit-user-select:text;user-select:text;outline:none}
@@ -91,7 +93,7 @@ ol.top{border-radius:10px}
 <canvas id="c"></canvas>
 <div id="hud">
   <div id="dl"><div id="dist">0 m</div><div id="coinc"><i></i><span id="cn">0</span></div></div>
-  <div id="gapw">ROCHER<div id="gapb"><i id="gapf"></i></div></div>
+  <div id="gapw"><img id="rkic" alt="">ROCHER<div id="gapb"><i id="gapf"></i></div></div>
   <button id="snd" aria-label="Son">&#9834;</button>
 </div>
 <div id="msg"></div>
@@ -1182,7 +1184,7 @@ function update(dt){
         else if(P.mode==='fly'){ents.push({type:'away',x:P.x,h:P.h-9});P.mode='jump';P.vy=0;P.dj=0;nextA=P.x+350+Math.random()*300;}
         else if(P.mode==='fallen'||P.mode==='tumble'){P.mode='run';P.tm=0;}
         P.fox=0;P.bolt=0;P.kick=0;P.inv=Math.max(P.inv,.4);
-        e.dead=true;P.boots=true;P.bolt=.45;shake=.3;sfx('ride');say('RENARD !',1);
+        e.dead=true;P.boots=true;P.bolt=.45;P.bseed=1+Math.floor(Math.random()*9999);shake=.3;sfx('ride');say('RENARD !',1);
         burst(e.x,e.h+4,14,['#ff8a1f','#ffd23f','#ffffff'],130);
       }
       continue;
@@ -1401,6 +1403,36 @@ function fir(sx,by,hg,pal){
 }
 /* round spinning coin, 7 px across */
 var COINW=[5,7,9,9,9,9,9,7,5],COINF=[1,.72,.2,.72];
+/* the boulder as a tiny pixel icon for the HUD label: angry eyes, shouting mouth, sunset rim */
+function rockIcon(){
+  try{
+    var R16=[
+"....kkkkkkkk....",
+"..kkllllgggggkk.",
+".kllllggggggggok",
+".klkkgggggkkggok",
+"kllggkkgkkgggGok",
+"klgwwwggwwwggGok",
+"klgwwkggwwkggGok",
+"kggwwkggwwkgGGok",
+"kgggggggggggGGok",
+"kggkkkkkkkgGGGok",
+"kggkwwwwwkgGGGok",
+".kgkrrrrrkGGGok.",
+".kggkkkkkGGGGok.",
+"..kkGGGGGGGokk..",
+"....kkkkkkkk...."],P16={k:'#2b1b2e',l:'#c8c2cd',g:'#958f9e',G:'#666070',w:'#ffffff',r:'#d83a2e',o:'#ff9a4a'};
+    var c=document.createElement('canvas');c.width=16;c.height=15;var x=c.getContext('2d'),i,j,ch;
+    for(j=0;j<R16.length;j++)for(i=0;i<16;i++){ch=R16[j].charAt(i);if(P16[ch]){x.fillStyle=P16[ch];x.fillRect(i,j,1,1);}}
+    var im=$('rkic');if(im)im.src=c.toDataURL();
+  }catch(e){}
+}
+/* the in-game coin, drawn once as a small picture for the score line */
+var coinURL='';
+function coinIcon(){
+  if(!coinURL){var c=document.createElement('canvas');c.width=11;c.height=12;var sv=ctx;ctx=c.getContext('2d');try{drawCoin(5,2,0);coinURL=c.toDataURL();}finally{ctx=sv;}}
+  return coinURL;
+}
 function drawCoin(cx,cy,ph){
   var f=COINF[ph],n=COINW.length,j,w,hw,ws=[];
   cy-=1;
@@ -1508,12 +1540,12 @@ function draw(){
   for(sx=-4;sx<W+4;sx+=2){
     var a0=camX*.05+sx;h=mh0(a0);hn=mh0(a0+2);lit=hn<h;
     rect('#ffc9a6',sx,GY-46-h,2,2);rect('#a37aaa',sx,GY-44-h,2,H);
-    if(h>74){sn2=Math.round((h-74)*.5)+2+(hsh(Math.round(a0))%3);rect('#f4e6ee',sx,GY-44-h,2,sn2);rect('#c99ac4',sx,GY-44-h+sn2,2,1);}
+    if(h>74){sn2=Math.min(7,Math.round((h-74)*.4)+1)+(hsh(Math.round(a0))%2);rect('#f4e6ee',sx,GY-44-h,2,sn2);}   /* thin cap that follows the ridge */
   }
   for(sx=-4;sx<W+4;sx+=2){
     var a=camX*.1+sx;h=mh1(a);hn=mh1(a+2);lit=hn<h;
     rect('#ffb37a',sx,GY-32-h,2,2);rect('#7b4f9e',sx,GY-30-h,2,H);
-    if(h>62){sn2=Math.min(16,Math.round((h-62)*.7)+1)+(hsh(Math.round(a))%3);rect('#f6d4d4',sx,GY-30-h,2,sn2);}
+    if(h>62){sn2=Math.min(8,Math.round((h-62)*.45)+1)+(hsh(Math.round(a))%2);rect('#f6d4d4',sx,GY-30-h,2,sn2);}
   }
   for(sx=-4;sx<W+4;sx+=2){
     var b=camX*.25+sx;h=mh2(b);hn=mh2(b+2);lit=hn<h;
@@ -1690,18 +1722,35 @@ function draw(){
   }
   /* orange lightning */
   if(P.bolt>0){
-    var bx=PX,by2=GY-P.h-10,sd=Math.floor(t*30),nx,yy;
-    for(yy=by2;yy>-8;yy-=7){
-      nx=PX+(hsh(yy*31+sd)%13)-6;
-      rect('#ff8a1f',Math.min(bx,nx)-2,yy-1,Math.abs(nx-bx)+5,4);rect('#ff8a1f',nx-2,yy-7,5,8);
-      rect('#fff3b8',Math.min(bx,nx)-1,yy,Math.abs(nx-bx)+3,2);rect('#fff3b8',nx-1,yy-7,3,8);
-      bx=nx;
+    /* a thin bolt strikes from the sky down to the hero: long slanted strokes with
+       short horizontal notches, like the classic icon; one shape per strike */
+    var sd=P.bseed||1,hy=Math.round(GY-P.h-14),top=-8,seg=(hy-top)/4,pts=[],dd2=[],nn2=[],cx2,cy2=top,k2;
+    /* 4 slanted strokes joined by 3 short notches, wide at the top and thinning to a point on the hero */
+    for(k2=0;k2<4;k2++){dd2.push(11+(hsh(sd+k2*13)%5));nn2.push(k2<3?7+(hsh(sd+k2*29)%3):0);}
+    cx2=PX;for(k2=0;k2<4;k2++)cx2+=dd2[k2]-nn2[k2];
+    pts.push([cx2,cy2]);
+    for(k2=0;k2<4;k2++){
+      cy2=k2===3?hy:Math.round(top+seg*(k2+1));cx2-=dd2[k2];
+      pts.push([cx2,cy2]);
+      if(k2<3){cx2+=nn2[k2];pts.push([cx2,cy2]);}
+    }
+    function bw(y){return Math.max(1,Math.round(7-6*(y-top)/(hy-top)));}
+    function stroke(c,ex){
+      for(var q=0;q<pts.length-1;q++){
+        var a1=pts[q],a2=pts[q+1],n2=Math.max(Math.abs(a2[0]-a1[0]),Math.abs(a2[1]-a1[1]))||1;
+        for(var u=0;u<=n2;u++){
+          var px2=Math.round(a1[0]+(a2[0]-a1[0])*u/n2),py3=Math.round(a1[1]+(a2[1]-a1[1])*u/n2),ss=bw(py3)+ex;
+          if(ss>0)rect(c,px2-(ss>>1),py3-(ss>>1),ss,ss);
+        }
+      }
+    }
+    if(P.bolt>.12||Math.floor(t*30)%2){
+      stroke('#2b1b2e',2);stroke('#f08a1f',0);stroke('#ffd23f',-1);stroke('#fff3b8',-3);
     }
     ctx.fillStyle='rgba(255,150,40,'+(0.35*P.bolt/.45).toFixed(2)+')';ctx.fillRect(-4,-4,W+8,H+8);
   }
   /* warm sunset light over the whole scene */
   ctx.fillStyle='rgba(255,110,50,0.14)';ctx.fillRect(-4,-4,W+8,H+8);
-  ctx.fillStyle='rgba(60,20,90,0.10)';ctx.fillRect(-4,-4,W+8,Math.round(H*.3));
 }
 
 /* ---------- scores ---------- */
@@ -1776,7 +1825,7 @@ function gameOver(){
   sc.push(me);sc.sort(function(a,b){return b.d-a.d;});sc=sc.slice(0,5);saveScores(sc);
   $('oname').textContent=pname+', le rocher t\'a rattrapé !';
   $('oscore').textContent=d+' pts';
-  $('obrk').textContent=dm+' m + '+coinN+(coinN>1?' pièces':' pièce')+' × 10';
+  $('obrk').innerHTML=dm+' m + '+coinN+' <img class="cic" alt="'+(coinN>1?'pièces':'pièce')+'" src="'+coinIcon()+'"> × 10';
   $('orec').textContent=d>best?'Nouveau record !':'';
   showTop($('otop'),sc,me);
   $('hud').style.display='none';$('msg').style.display='none';
@@ -1907,6 +1956,7 @@ buildPicker();
 try{var sn=localStorage.getItem('tobias_name');if(sn)$('nm').value=sn;var sc0=parseInt(localStorage.getItem('tobias_char'),10);if(sc0>=0&&sc0<CH.length)sel=sc0;}catch(e){}
 pick(sel);
 menu();
+rockIcon();
 /* intro: tap to skip, removed once it has faded out */
 (function(){
   var it=$('intro');if(!it)return;
