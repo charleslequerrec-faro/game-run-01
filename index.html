@@ -69,7 +69,8 @@ ul.how li{padding:2px 0 2px 18px;position:relative}
 ul.how li:before{content:"";position:absolute;left:2px;top:8px;width:8px;height:8px;background:#f2c230}
 .big{font-size:44px;font-weight:bold;color:#fff;margin:6px 0 0}
 .rec{font-size:19px;font-weight:bold;color:#8fd45a;min-height:18px;margin-bottom:6px}
-ol.top{margin:10px 0 0;padding:8px 10px;list-style:none;background:#1b1430;font-size:19px;font-weight:bold;text-align:left}
+ol.top{margin:10px 0 0;padding:8px 10px;list-style:none;background:#1b1430;font-size:19px;font-weight:bold;text-align:left;position:relative;max-height:150px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;scrollbar-width:thin;scrollbar-color:#f2c230 #1b1430}
+ol.top::-webkit-scrollbar{width:6px}ol.top::-webkit-scrollbar-thumb{background:#f2c230}ol.top::-webkit-scrollbar-track{background:#1b1430}
 ol.top li{display:flex;justify-content:space-between;align-items:center;padding:2px 0}
 ol.top li span:first-child{display:flex;align-items:center}
 .ic{width:26px;height:28px;image-rendering:pixelated;image-rendering:crisp-edges;margin:0 6px 0 4px}
@@ -1755,6 +1756,18 @@ function draw(){
 }
 
 /* ---------- scores ---------- */
+/* shared top 20: address of scores.php on the web host. Empty = scores stay in this browser only */
+var SCORE_URL='';
+var netTop=null;   /* last shared top 5 received from the server */
+function netGet(cb){
+  if(!SCORE_URL||!window.fetch)return;
+  fetch(SCORE_URL,{cache:'no-store'}).then(function(r){return r.json();}).then(function(j){if(j&&Array.isArray(j.top)){netTop=j.top;cb(j.top);}}).catch(function(){});
+}
+function netPost(m,k,c,n,cb){
+  if(!SCORE_URL||!window.fetch)return;
+  fetch(SCORE_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({n:n,c:c,m:m,k:k})})
+    .then(function(r){return r.json();}).then(function(j){if(j&&Array.isArray(j.top)){netTop=j.top;cb(j.top,j.id);}}).catch(function(){});
+}
 function loadScores(){try{var s=JSON.parse(localStorage.getItem('tobias_scores2')||'[]');return Array.isArray(s)?s:[];}catch(e){return [];}}
 function saveScores(s){try{localStorage.setItem('tobias_scores2',JSON.stringify(s));}catch(e){}}
 function icon(ci){
@@ -1785,7 +1798,13 @@ function showTop(el,scores,mark){
     if(scores[i]===mark)li.className='me';
     li.appendChild(a);li.appendChild(b);el.appendChild(li);
   }
+  /* top 20 in a scrolling box: start at the top, or on the new score if it is further down */
   if(!scores.length){var e=document.createElement('li');e.textContent='Pas encore de score';el.appendChild(e);}
+  scrollMe(el);
+}
+function scrollMe(el){
+  el.scrollTop=0;
+  var me2=el.querySelector('li.me');if(me2)el.scrollTop=Math.max(0,me2.offsetTop-el.clientHeight/2);
 }
 /* crushed: the hero vanishes in a cloud of sparks, then the end screen comes up */
 var dieT=0;
@@ -1822,17 +1841,23 @@ function updateDying(dt){
 }
 function gameOver(){
   st='over';
-  var dm=Math.floor(P.x/10),d=dm+coinN*10,sc=loadScores(),best=sc.length?sc[0].d:0,me={n:pname,d:d,c:sel};
-  sc.push(me);sc.sort(function(a,b){return b.d-a.d;});sc=sc.slice(0,5);saveScores(sc);
+  var dm=Math.floor(P.x/10),d=dm+coinN*10,sc=loadScores(),best=Math.max(sc.length?sc[0].d:0,netTop&&netTop.length?netTop[0].d:0),me={n:pname,d:d,c:sel};
+  sc.push(me);sc.sort(function(a,b){return b.d-a.d;});sc=sc.slice(0,20);saveScores(sc);
   $('oname').textContent=pname+', le rocher t\'a rattrapé !';
   $('oscore').textContent=d+' pts';
   $('obrk').innerHTML=dm+' m + '+coinN+' <img class="cic" alt="'+(coinN>1?'pièces':'pièce')+'" src="'+coinIcon()+'"> × 10';
   $('orec').textContent=d>best?'Nouveau record !':'';
-  showTop($('otop'),sc,me);
+  showTop($('otop'),netTop||sc,netTop?null:me);
+  /* send the score; the shared top 5 replaces the list as soon as it comes back */
+  netPost(dm,coinN,sel,pname,function(top,id){
+    var mk=null;for(var q=0;q<top.length;q++)if(top[q].id===id)mk=top[q];
+    showTop($('otop'),top,mk);
+  });
   $('hud').style.display='none';$('msg').style.display='none';
   /* back to the opening wide shot: castle standing, hero in front of it, boulder out of sight */
   reset();
   $('over').style.display='flex';
+  scrollMe($('otop'));   /* now that the list has a height */
 }
 function start(){
   var v=($('nm').value||'').replace(/\s+/g,' ').trim();
@@ -1846,7 +1871,8 @@ function start(){
 function menu(){
   st='menu';reset();
   $('over').style.display='none';$('hud').style.display='none';$('msg').style.display='none';
-  showTop($('mtop'),loadScores(),null);
+  showTop($('mtop'),netTop||loadScores(),null);
+  netGet(function(top){if(st==='menu')showTop($('mtop'),top,null);});
   $('menu').style.display='flex';
 }
 

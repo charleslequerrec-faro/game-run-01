@@ -1,0 +1,4 @@
+# Le fichier des scores n'est lisible qu'à travers scores.php
+<Files "scores.txt">
+  Require all denied
+</Files>
