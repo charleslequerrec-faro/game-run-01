@@ -99,7 +99,7 @@ ul.how li{padding:2px 0 2px 18px;position:relative}
 ul.how li:before{content:"";position:absolute;left:2px;top:8px;width:8px;height:8px;background:#f2c230}
 .big{font-size:44px;font-weight:bold;color:#fff;margin:6px 0 0}
 .rec{font-size:19px;font-weight:bold;color:#8fd45a;min-height:18px;margin-bottom:6px}
-ol.top{margin:10px 0 0;padding:8px 10px;list-style:none;background:#1b1430;font-size:19px;font-weight:bold;text-align:left;position:relative;max-height:150px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;scrollbar-width:thin;scrollbar-color:#f2c230 #1b1430}
+ol.top{margin:10px 0 0;padding:8px 10px;list-style:none;background:#1b1430;font-size:19px;font-weight:bold;text-align:left;position:relative;max-height:186px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;scrollbar-width:thin;scrollbar-color:#f2c230 #1b1430}
 ol.top::-webkit-scrollbar{width:6px}ol.top::-webkit-scrollbar-thumb{background:#f2c230}ol.top::-webkit-scrollbar-track{background:#1b1430}
 ol.top li{display:flex;justify-content:space-between;align-items:center;padding:2px 0}
 ol.top li span:first-child{display:flex;align-items:center}
@@ -110,6 +110,18 @@ ol.top li span:first-child{display:flex;align-items:center}
 #chars canvas{width:36px;height:44px;image-rendering:pixelated;image-rendering:crisp-edges}
 #clab{font-size:18px;font-weight:bold;color:#f2c230;margin:0 0 10px;min-height:16px}
 ol.top li.me{color:#f2c230}
+/* top 3 podium rows */
+ol.top li.r1,ol.top li.r2,ol.top li.r3{margin:0 -4px 4px;padding:5px 8px 5px 5px;border-radius:8px;border:2px solid}
+ol.top li.r1{border-color:#f2c230;background:linear-gradient(90deg,rgba(242,194,48,.30),rgba(242,194,48,.06))}
+ol.top li.r2{border-color:#c9cedb;background:linear-gradient(90deg,rgba(201,206,219,.24),rgba(201,206,219,.05))}
+ol.top li.r3{border-color:#d9874a;background:linear-gradient(90deg,rgba(217,135,74,.26),rgba(217,135,74,.05))}
+ol.top li.r1 span:last-child{color:#ffd23f}
+ol.top li.r3+li{margin-top:2px}
+ol.top .md{display:inline-flex;align-items:center;justify-content:center;flex:none;width:22px;height:22px;margin-right:7px;border-radius:50%;border:2px solid #2b1b2e;
+  font-style:normal;font-size:14px;line-height:1;color:#2b1b2e;box-shadow:inset 2px 2px 0 rgba(255,255,255,.55),inset -2px -2px 0 rgba(0,0,0,.18)}
+ol.top li.r1 .md{background:#f2c230}
+ol.top li.r2 .md{background:#c9cedb}
+ol.top li.r3 .md{background:#d9874a}
 .toph{font-size:16px;margin-top:12px;letter-spacing:2px;color:#f2c230;font-weight:bold}
 .panel{border-radius:18px}
 .btn{border-radius:12px}
@@ -1845,8 +1857,11 @@ function showTop(el,scores,mark){
   el.textContent='';
   for(var i=0;i<scores.length;i++){
     var li=document.createElement('li'),a=document.createElement('span'),b=document.createElement('span');
-    a.appendChild(document.createTextNode((i+1)+'.'));a.appendChild(icon(scores[i].c));a.appendChild(document.createTextNode(scores[i].n));b.textContent=scores[i].d+' pts';
-    if(scores[i]===mark)li.className='me';
+    /* podium: a gold, silver or bronze medal for the first three, a plain rank after */
+    if(i<3){var md=document.createElement('i');md.className='md';md.textContent=(i+1);a.appendChild(md);}
+    else a.appendChild(document.createTextNode((i+1)+'.'));
+    a.appendChild(icon(scores[i].c));a.appendChild(document.createTextNode(scores[i].n));b.textContent=scores[i].d+' pts';
+    li.className=(i<3?'r'+(i+1):'')+(scores[i]===mark?' me':'');
     li.appendChild(a);li.appendChild(b);el.appendChild(li);
   }
   /* top 20 in a scrolling box: start at the top, or on the new score if it is further down */
