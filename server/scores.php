@@ -19,6 +19,7 @@ header('Access-Control-Allow-Headers: Content-Type');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
 
 $FILE  = __DIR__ . '/scores.txt';     // le fichier des scores
+$RATE  = __DIR__ . '/limite.txt';     // envois des 60 dernières secondes, effacés au fur et à mesure
 $KEEP  = 50;                          // scores gardés dans le fichier
 $SHOW  = 20;                          // scores renvoyés au jeu
 $WAIT  = 5;                           // secondes minimum entre deux envois d'une même adresse IP
@@ -28,6 +29,22 @@ function read_scores($fp) {
   $raw = stream_get_contents($fp);
   $list = json_decode($raw ?: '[]', true);
   return is_array($list) ? $list : [];
+}
+/* noms grossiers : le nom est remplacé par « Anonyme », le score est gardé */
+function clean_name($name) {
+  $t = mb_strtolower($name, 'UTF-8');
+  $t = strtr($t, ['à'=>'a','â'=>'a','ä'=>'a','é'=>'e','è'=>'e','ê'=>'e','ë'=>'e','î'=>'i','ï'=>'i','ô'=>'o','ö'=>'o','ù'=>'u','û'=>'u','ü'=>'u','ç'=>'c',
+                  '0'=>'o','1'=>'i','3'=>'e','4'=>'a','5'=>'s','7'=>'t','@'=>'a','$'=>'s','€'=>'e']);
+  $joined = preg_replace('/[^a-z]/', '', $t);              // « m.e.r.d.e » -> « merde »
+  $words  = preg_split('/[^a-z]+/', $t, -1, PREG_SPLIT_NO_EMPTY);
+  // mots repérés même collés à d'autres lettres
+  $inside = ['merde','putain','salope','salaud','encule','enculer','connard','connasse','batard','bordel','pouffiasse','nique','niquer','ntm','fdp','tg',
+             'fuck','shit','bitch','asshole','dick','pussy','cunt','nazi','hitler','pedo','porn','porno','sexe','sex'];
+  // mots courts repérés seulement seuls, pour ne pas bloquer « Constance » ou « Pascal »
+  $alone  = ['con','cons','conne','cul','bite','pute','putes','teub','zizi','chier','gay','pd'];
+  foreach ($inside as $w) { if ($w !== 'tg' && $w !== 'ntm' && $w !== 'fdp' && strpos($joined, $w) !== false) return 'Anonyme'; }
+  foreach ($words as $w) { if (in_array($w, $alone, true) || in_array($w, ['tg','ntm','fdp'], true)) return 'Anonyme'; }
+  return $name;
 }
 function public_list($list, $n) {
   $out = [];
@@ -56,6 +73,7 @@ if (!is_array($in)) { http_response_code(400); echo json_encode(['error' => 'don
 /* vérifications : nom, personnage, distance et pièces plausibles */
 $name = trim(preg_replace('/\s+/u', ' ', strip_tags((string)($in['n'] ?? ''))));
 $name = mb_substr($name, 0, 12, 'UTF-8');
+$name = clean_name($name);
 $char = (int)($in['c'] ?? -1);
 $m    = (int)($in['m'] ?? -1);
 $k    = (int)($in['k'] ?? -1);
@@ -63,20 +81,33 @@ if ($name === '' || $char < 0 || $char > 5 || $m < 0 || $m > 200000 || $k < 0 ||
   http_response_code(400); echo json_encode(['error' => 'score refusé']); exit;
 }
 
-flock($fp, LOCK_EX);
-$list = read_scores($fp);
-
-/* une même adresse IP ne peut pas envoyer plus d'un score toutes les $WAIT secondes */
-$ip = hash('sha256', ($_SERVER['REMOTE_ADDR'] ?? '') . 'fastfox');
-foreach ($list as $s) {
-  if (($s['ip'] ?? '') === $ip && time() - ($s['t'] ?? 0) < $WAIT) {
-    flock($fp, LOCK_UN); fclose($fp);
+/* une même connexion ne peut pas envoyer plus d'un score toutes les $WAIT secondes.
+   L'empreinte de l'adresse IP n'est gardée que 60 secondes, dans limite.txt, jamais avec les scores. */
+$rp = fopen($RATE, 'c+');
+if ($rp) {
+  flock($rp, LOCK_EX);
+  $seen = json_decode(stream_get_contents($rp) ?: '{}', true);
+  if (!is_array($seen)) $seen = [];
+  $now = time();
+  foreach ($seen as $h => $t0) { if ($now - $t0 > 60) unset($seen[$h]); }
+  $ip = hash('sha256', ($_SERVER['REMOTE_ADDR'] ?? '') . date('Y-m-d') . __FILE__);
+  if (isset($seen[$ip]) && $now - $seen[$ip] < $WAIT) {
+    flock($rp, LOCK_UN); fclose($rp); fclose($fp);
     http_response_code(429); echo json_encode(['error' => 'trop rapide']); exit;
   }
+  $seen[$ip] = $now;
+  ftruncate($rp, 0); rewind($rp); fwrite($rp, json_encode($seen)); fflush($rp);
+  flock($rp, LOCK_UN); fclose($rp);
 }
 
+flock($fp, LOCK_EX);
+$list = read_scores($fp);
+/* les anciens scores perdent leur empreinte IP */
+foreach ($list as &$s0) { unset($s0['ip']); }
+unset($s0);
+
 $id = bin2hex(random_bytes(6));
-$list[] = ['id' => $id, 'n' => $name, 'd' => $m + $k * 10, 'c' => $char, 't' => time(), 'ip' => $ip];
+$list[] = ['id' => $id, 'n' => $name, 'd' => $m + $k * 10, 'c' => $char, 't' => time()];
 usort($list, function ($a, $b) { return $b['d'] <=> $a['d']; });
 $list = array_slice($list, 0, $KEEP);
 

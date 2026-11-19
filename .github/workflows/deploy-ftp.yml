@@ -45,3 +45,4 @@ jobs:
             **/.git*
             **/.git*/**
             scores.txt
+            limite.txt

@@ -1,4 +1,10 @@
-# Le fichier des scores n'est lisible qu'à travers scores.php
-<Files "scores.txt">
+# Les fichiers de données (scores, limite d'envois, état du déploiement) ne sont pas lisibles depuis le web :
+# le classement passe uniquement par scores.php
+<FilesMatch "\.(txt|json)$">
   Require all denied
-</Files>
+</FilesMatch>
+
+# Pas de référencement : les moteurs de recherche ne doivent indexer aucun fichier de ce dossier
+<IfModule mod_headers.c>
+  Header set X-Robots-Tag "noindex, nofollow, noarchive"
+</IfModule>
