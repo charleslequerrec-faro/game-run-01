@@ -1,0 +1,47 @@
+# Sends the game and the scores script to Charles's server over FTP on every push to main.
+# Server address and login live in the repository secrets (Settings > Secrets and variables > Actions):
+#   FTP_SERVER      e.g. ftp.example.com
+#   FTP_USERNAME    FTP login (ideally limited to the game folder)
+#   FTP_PASSWORD    FTP password
+#   FTP_SERVER_DIR  folder on the server, ending with a slash, e.g. /www/fastfox/
+# Until FTP_SERVER is set, the job does nothing and does not fail.
+name: Déploiement FTP
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      FTP_SERVER: ${{ secrets.FTP_SERVER }}
+    steps:
+      - name: Récupérer le code
+        if: env.FTP_SERVER != ''
+        uses: actions/checkout@v4
+
+      - name: Préparer les fichiers à envoyer
+        if: env.FTP_SERVER != ''
+        run: |
+          mkdir -p deploy
+          cp index.html deploy/
+          cp server/scores.php deploy/
+          cp server/.htaccess deploy/
+
+      - name: Envoyer sur le serveur
+        if: env.FTP_SERVER != ''
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          local-dir: ./deploy/
+          server-dir: ${{ secrets.FTP_SERVER_DIR }}
+          # never touch the leaderboard file that lives on the server
+          exclude: |
+            **/.git*
+            **/.git*/**
+            scores.txt

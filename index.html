@@ -1758,6 +1758,8 @@ function draw(){
 /* ---------- scores ---------- */
 /* shared top 20: address of scores.php on the web host. Empty = scores stay in this browser only */
 var SCORE_URL='';
+/* on Charles's own server the script sits next to the game: use it directly */
+try{if(/^https?:$/.test(location.protocol)&&!/github\.io$/.test(location.hostname)&&!/claude/.test(location.hostname))SCORE_URL='scores.php';}catch(e){}
 var netTop=null;   /* last shared top 5 received from the server */
 function netGet(cb){
   if(!SCORE_URL||!window.fetch)return;
