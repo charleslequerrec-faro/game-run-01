@@ -173,7 +173,7 @@ ol.top{border-radius:10px}
       <li>Saute par-dessus les obstacles et les précipices.</li>
       <li>Ça se corse peu à peu : nouveaux obstacles au fil des mètres, et le rocher accélère tous les 1000 m.</li>
       <li>Traverse les chalets en bois ou saute sur leur toit. Le rocher les écrase !</li>
-      <li>Très rare : au bout de la terrasse du grand chalet, l'écusson au renard te transforme en renard à cape. Tu cours 2 fois plus vite, tu sautes 2 fois plus haut et tu es invincible : tu fonces à travers les obstacles et tu passes au-dessus des précipices. Le pouvoir dure 15 secondes. Tant que tu es renard, rien ne remplace ce pouvoir (ni cheval, ni charrette, ni dragon).</li>
+      <li>Très rare : caché au hasard sur le chemin ou dans un chalet, l'écusson au renard te transforme en renard à cape. Tu cours 2 fois plus vite, tu sautes 2 fois plus haut et tu es invincible : tu fonces à travers les obstacles et tu passes au-dessus des précipices. Le pouvoir dure 15 secondes. Tant que tu es renard, rien ne remplace ce pouvoir (ni cheval, ni charrette, ni dragon).</li>
       <li>Saute sur un cheval sauvage pour galoper. Il saute aussi, mais un obstacle te fait tomber !</li>
       <li>Saute dans une charrette : elle file plus vite que le cheval et peut sauter une fois, mais elle se casse au premier obstacle. Seul l'écusson au renard peut la remplacer.</li>
       <li>Attrape un dragon pour voler. Touche l'écran pour battre des ailes et évite les oiseaux !</li>
@@ -942,17 +942,18 @@ function loseBoots(){
   P.boots=false;
   for(var i=0;i<8;i++)parts.push({x:P.x,h:P.h+3,vx:(Math.random()-.5)*90,vy:60+Math.random()*60,l:.5,c:i%2?'#ffd23f':'#fff3b8'});
 }
-function spawnChalet(kind,x0){
-  var e,i,xx,bx;
+function spawnChalet(kind,x0,crest){
+  var e,i,xx,bx,w;
   if(kind===2){
     ents.push({type:'chalet',k:1,x:x0,w:CHA[1].w,top:CHA[1].top,fl:elev(x0)});
     e={type:'chalet',k:2,x:x0+CHA[1].w,w:CHA[2].w,top:0,fl:elev(x0)};ents.push(e);
-    bx=e.x+e.w-9;
-    ents.push({type:'boots',x:bx,h:elev(bx)-e.fl+1,on:e});
-    return CHA[1].w+CHA[2].w;
+    bx=e.x+e.w-9;w=CHA[1].w+CHA[2].w;
   }
-  if(kind===1){for(i=0;i<3;i++){xx=x0+i*(CHA[0].w+8);ents.push({type:'chalet',k:0,x:xx,w:CHA[0].w,top:CHA[0].top,fl:elev(xx)});}return 3*CHA[0].w+16;}
-  ents.push({type:'chalet',k:0,x:x0,w:CHA[0].w,top:CHA[0].top,fl:elev(x0)});return CHA[0].w;
+  else if(kind===1){for(i=0;i<3;i++){xx=x0+i*(CHA[0].w+8);ents.push({type:'chalet',k:0,x:xx,w:CHA[0].w,top:CHA[0].top,fl:elev(xx)});if(i===1)e=ents[ents.length-1];}bx=e.x+e.w/2;w=3*CHA[0].w+16;}
+  else{e={type:'chalet',k:0,x:x0,w:CHA[0].w,top:CHA[0].top,fl:elev(x0)};ents.push(e);bx=e.x+e.w/2;w=CHA[0].w;}
+  /* the fox crest, when it falls on a chalet, sits on its floor (or at the end of the big chalet's terrace) */
+  if(crest)ents.push({type:'boots',x:bx,h:elev(bx)-e.fl+1,on:e});
+  return w;
 }
 function stumble(){
   loseBoots();
@@ -1216,8 +1217,8 @@ function update(dt){
   /* spawns */
   var ahead=P.x-PX+W+60;
   if(ahead>nextG){
-    var r=Math.random(),rc=Math.random(),dM=nextG/10;
-    if(gt>4&&rc<.14){nextG+=spawnChalet(rc<.03?2:(rc<.07?1:0),nextG)+10;}
+    var r=Math.random(),rc=Math.random(),dM=nextG/10,crest=gt>4&&Math.random()<.03;   /* as often as the big chalet that used to carry it */
+    if(gt>4&&rc<.14){nextG+=spawnChalet(rc<.03?2:(rc<.07?1:0),nextG,crest)+10;crest=false;}
     else if(gt>6&&nextG>P.nf&&Math.random()<.3){ents.push({type:'cart',x:nextG});P.nf=nextG+900;}
     else if(r<.2)ents.push({type:'horse',x:nextG});
     else if(r<.4&&dM>=400)ents.push({type:'pit',x:nextG,w:26+Math.floor(Math.random()*9)});
@@ -1229,8 +1230,10 @@ function update(dt){
       if(dM>=1200&&Math.random()<Math.min(.3,.1+(dM-1200)/6000)){ents.push({type:'ob',k:kinds[Math.floor(Math.random()*kinds.length)],x:nextG+20});nextG+=20;}
     }
     /* spacing: wide at the start, tightening steadily until 2500 m */
-    var du=Math.min(1,dM/2500);
+    var du=Math.min(1,dM/2500),g0=nextG;
     nextG+=Math.max(run,P.v)*.5+(200-130*du)+Math.random()*(140-60*du);
+    /* the fox crest turns up at random, lying on the path in the gap before the next spawn (or in a chalet, above) */
+    if(crest)ents.push({type:'boots',x:g0+30+(nextG-g0-60)*Math.random(),h:4,on:null});
   }
   if(ahead>nextA){
     if(P.mode==='fly'){
@@ -1543,6 +1546,15 @@ function drawCoin(cx,cy,ph){
     rect('#f0b429',cx-1,cy+3,2,3);
   }else if(ws[4]>=3){rect('#fff3b8',cx-(ws[4]-1)/2,cy+2,1,4);rect('#e8a21f',cx+(ws[4]-1)/2,cy+3,1,4);}
 }
+function drawCrest(sx,gy,h){
+  var by3=gy-h-15+Math.round(Math.sin(t*5)*1.5),bxl=Math.round(sx)-6;
+  /* soft pulsing halo so the crest catches the eye from afar */
+  ctx.globalAlpha=.22+.12*Math.sin(t*6);
+  rect('#ffe45c',bxl-4,by3-2,21,18);rect('#ffe45c',bxl-2,by3-4,17,22);
+  ctx.globalAlpha=1;
+  D(sBoots,bxl,by3);
+  for(var bs=0;bs<6;bs++){var bh2=hsh(Math.floor(t*10)*7+bs*311);if(bh2%3)continue;var bxx=bxl-5+bh2%23,byy=by3-6+(bh2>>>5)%24;rect('#ffffff',bxx-1,byy,3,1);rect('#ffffff',bxx,byy-1,1,3);}
+}
 function drawChalet(e,camX,gys,inside){
   var A=CHA[e.k],c=A.c,sx,gy,i,x,fy=Math.round(gys(P.x)+e.fl-elev(P.x)),x0=Math.round(e.x-camX);
   if(e.broken){
@@ -1560,6 +1572,7 @@ function drawChalet(e,camX,gys,inside){
       x=e.x+i;gy=Math.round(gys(x));sx=Math.round(x-camX);
       if(gy>fy+3){rect('#2b1b2e',sx-1,fy+3,5,gy-fy-1);rect('#b8824f',sx,fy+3,3,gy-fy-2);rect('#e0ad6c',sx,fy+3,1,gy-fy-2);rect('#8a5a2b',sx+2,fy+3,1,gy-fy-2);}
     }
+    for(i=0;i<ents.length;i++)if(ents[i].type==='boots'&&ents[i].on===e)drawCrest(ents[i].x-camX,gys(ents[i].x),ents[i].h);
     ctx.drawImage(c,x0,fy+1-A.rail);
     return;
   }
@@ -1736,13 +1749,8 @@ function draw(){
     }
     if(sx<-40||sx>W+40)continue;gy=gys(e.x);
     if(e.type==='boots'){
-      var by3=gy-e.h-15+Math.round(Math.sin(t*5)*1.5),bxl=Math.round(sx)-6;
-      /* soft pulsing halo so the crest catches the eye from afar */
-      ctx.globalAlpha=.22+.12*Math.sin(t*6);
-      rect('#ffe45c',bxl-4,by3-2,21,18);rect('#ffe45c',bxl-2,by3-4,17,22);
-      ctx.globalAlpha=1;
-      D(sBoots,bxl,by3);
-      for(var bs=0;bs<6;bs++){var bh2=hsh(Math.floor(t*10)*7+bs*311);if(bh2%3)continue;var bxx=bxl-5+bh2%23,byy=by3-6+(bh2>>>5)%24;rect('#ffffff',bxx-1,byy,3,1);rect('#ffffff',bxx,byy-1,1,3);}
+      /* on the big chalet's terrace the crest is drawn with the chalet, behind the railing */
+      if(!(e.on&&e.on.k===2&&!e.on.broken))drawCrest(sx,gy,e.h);
       continue;
     }
     if(e.type==='ob'){var o=OB[e.k];D(o.s,sx-o.w/2,gy-(o.dh||o.hh)+1);}
