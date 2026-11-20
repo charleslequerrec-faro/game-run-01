@@ -168,7 +168,7 @@ ol.top{border-radius:10px}
       <li>Touche l'écran pour sauter.</li>
       <li>Super saut : retouche l'écran pendant ton saut et ta cape t'emporte plus haut. Une seule fois par saut !</li>
       <li>Ramasse les pièces d'or : chacune vaut 10 points, chaque mètre vaut 1 point.</li>
-      <li>Toutes les 100 pièces, c'est le mode bonus : tu t'envoles 10 secondes dans un ciel rempli de pièces. Tu deviens un renard à cape. Garde le doigt appuyé pour monter, relâche pour descendre.</li>
+      <li>Toutes les 200 pièces, c'est le mode bonus : tu t'envoles 10 secondes dans un ciel rempli de pièces. Tu deviens un renard à cape. Garde le doigt appuyé pour monter, relâche pour descendre.</li>
       <li>Tu es tombé ? Tapote vite l'écran pour te relever plus vite.</li>
       <li>Saute par-dessus les obstacles et les précipices.</li>
       <li>Ça se corse peu à peu : nouveaux obstacles au fil des mètres, et le rocher accélère tous les 1000 m.</li>
@@ -893,11 +893,14 @@ function genCoins(upTo){
     for(i=0;i<3;i++)coins.push({x:b2+i*16,h:6});
     /* a second sky row, drawn independently: twice as many coins out of reach without the fox or the dragon */
     if((hv>>>20)%25<6)for(i=0;i<7;i++)coins.push({x:b2-40+i*16,h:88});
+    /* a high row in the sky: within the dragon's reach and the fox's double jump (apex about 140) */
+    if((hv>>>24)%10<4){var top=Math.min(CEIL-6,125),ax=bx+120+(hv>>>4)%40,arc=[1,1,1,1,1,1,1];
+      for(i=0;i<arc.length;i++)coins.push({x:ax+i*16,h:Math.round(top*arc[i])});}
   }
 }
 function reset(){
   P={x:0,h:0,vy:0,v:0,mode:'wait',tm:0,inv:0,pit:0,fox:0,bolt:0,nf:1200,stage:0};
-  rock={x:-285,a:0,v:0,dx:-285,al:1};ents=[];parts=[];gt=0;it=0;nextG=170;nextA=340;shake=0;castleAlive=true;msgT=0;lastDist=-1;lastGap=-1;coins=[];coinG=0;coinN=0;lastCoin=-1;held=false;bcoins=[];nextBonus=100;
+  rock={x:-285,a:0,v:0,dx:-285,al:1};ents=[];parts=[];gt=0;it=0;nextG=170;nextA=340;shake=0;castleAlive=true;msgT=0;lastDist=-1;lastGap=-1;coins=[];coinG=0;coinN=0;lastCoin=-1;held=false;bcoins=[];nextBonus=BONUS_EVERY;
   /* a fox crest waits on the path a few steps ahead: a boost to start the run */
   ents.push({type:'boots',x:110,h:4,on:null});
   $('bt').style.display='none';$('cd').style.display='none';
@@ -982,8 +985,9 @@ function tap(){
   }
 }
 
-/* ---------- bonus flight: every 100 coins ---------- */
-var held=false,bcoins=[],nextBonus=100,bNext=0,lastCd=-1,lastBt=-1,lastCoinS=0;
+/* ---------- bonus flight: every 200 coins ---------- */
+var BONUS_EVERY=200;
+var held=false,bcoins=[],nextBonus=BONUS_EVERY,bNext=0,lastCd=-1,lastBt=-1,lastCoinS=0;
 function bonusTop(){return H-96;}
 function startBonus(){
   /* the cart is kept for after the bonus: only the fox crest replaces it */
@@ -1002,7 +1006,7 @@ function endBonus(){
   rock.x=P.x-P.bgap;rock.dx=rock.x;
   ents=[];bcoins=[];parts=[];
   nextG=Math.max(nextG,P.x-PX+W+40);nextA=Math.max(nextA,P.x-PX+W+160);
-  nextBonus=(Math.floor(coinN/100)+1)*100;
+  nextBonus=(Math.floor(coinN/BONUS_EVERY)+1)*BONUS_EVERY;
   $('bt').style.display='none';$('cd').style.display='none';
   sfx('flap');
 }
@@ -1477,9 +1481,11 @@ function drawCastle(camX,gyb){
 }
 var FIRPAL=[['#2fa35c','#1f7a4a','#63d187'],['#3fb86a','#2a8f52','#7fe09a'],['#1f8a5a','#136145','#48b888'],
   ['#5aa83a','#3d7f2a','#8fd45a'],['#2a7d6b','#1b5a50','#56b09c'],['#237a3c','#165a2b','#4fa862'],['#74b043','#4f8a2e','#a6d96a']];
-function fir(sx,by,hg,pal){
+function fir(sx,by,hg,pal,gb){
   pal=pal||FIRPAL[0];
-  sx=Math.round(sx);rect('#2b1b2e',sx-2,by-7,5,7);rect('#8a5a2b',sx-1,by-7,3,7);
+  sx=Math.round(sx);
+  /* trunk: each column reaches down to the ground right under it (gb[0..4] for sx-2..sx+2), so its foot follows the slope */
+  for(var tc=-2;tc<=2;tc++){var tb=gb?gb[tc+2]:by,tl=Math.max(1,tb-(by-7));rect(tc===-2||tc===2?'#2b1b2e':'#8a5a2b',sx+tc,by-7,1,tl);}
   var hc=hg-6,top=by-6-hc,nt=Math.max(3,Math.min(6,Math.round(hc/13))),q=hc/nt,j,tier,half;
   rect('#2b1b2e',sx,top-1,1,1);
   for(j=0;j<=hc;j++){
@@ -1712,7 +1718,8 @@ function draw(){
     var tx=c*46+th%30,over=false;
     for(var pj=0;pj<pits.length;pj++)if(Math.abs(tx-pits[pj].x)<pits[pj].w/2+18)over=true;
     var hr=((th>>>5)%100)/100,hg2=Math.round(26+hr*hr*46+((th>>>12)%3===0?28:0)+(th>>>15)%10);
-    if(!over)fir(tx-camX,Math.round(gys(tx))+2,hg2,FIRPAL[(th>>>19)%FIRPAL.length]);
+    if(!over){var fgb=[],fd;for(fd=-2;fd<=2;fd++)fgb.push(Math.round(gys(tx+fd))+1);
+      fir(tx-camX,Math.round(gys(tx))+2,hg2,FIRPAL[(th>>>19)%FIRPAL.length],fgb);}
   }
   /* gold coins */
   for(i=0;i<coins.length;i++){
