@@ -1182,7 +1182,9 @@ function update(dt){
     if(stg>P.stage){P.stage=stg;say(stg*1000+' m ! LE ROCHER ACCÉLÈRE',1.6);sfx('sup');shake=Math.max(shake,.25);}
   }
   rock.x+=rs*dt;rock.a+=rs*dt/R;
-  var maxLead=Math.max(125,200-15*(P.stage||0));     /* the lead you can build shrinks a little each stage */
+  /* the boulder keeps its own pace: a lead you build stays yours. It is only held within 60 m
+     (5 m less each stage, never under 30 m) so it never drops completely out of the chase */
+  var maxLead=Math.max(300,600-50*(P.stage||0));
   if(!wait&&P.x-rock.x>maxLead)rock.x=P.x-maxLead;
   if(castleAlive&&rock.x+R>-96){castleAlive=false;shake=.5;sfx('hit');
     for(i=0;i<44;i++)parts.push({x:-110+Math.random()*95,h:Math.random()*75,vx:Math.random()*120-20,vy:Math.random()*120+30,l:.7+Math.random()*.6,c:['#cfc8bb','#b9b3a8','#d83a2e','#8d8d9c'][i%4]});
@@ -1275,6 +1277,15 @@ function update(dt){
     if(e.type==='ob'){
       o=OB[e.k];
       if(P.fox>0||P.boots){if(Math.abs(dx)<o.w/2+6&&P.h<o.hh){e.dead=true;burst(e.x,4,8,['#8d8d9c','#a0714a','#4fa83d'],120);sfx('flap');}}
+      else if(inCart()&&(e.k==='log'||e.k==='bush')){
+        /* the cart smashes logs and bushes on its way without slowing down */
+        if(Math.abs(dx)<o.w/2+2&&P.h<o.hh-2){
+          e.dead=true;shake=Math.max(shake,.15);sfx('hit');
+          var wd=e.k==='log',pc=wd?['#b8824f','#7a5232','#e8c58a']:['#4fa83d','#2f7a2c','#8fd45a'];
+          burst(e.x,4,12,pc,150);
+          for(var ck=0;ck<5;ck++)parts.push({x:e.x+(Math.random()-.5)*o.w,h:3+Math.random()*6,vx:P.v*.6+Math.random()*90-30,vy:70+Math.random()*90,l:.7+Math.random()*.4,c:pc[ck%2],d:wd?'#5a3416':'#1f5a1f',b:[3+Math.floor(Math.random()*2),3]});
+        }
+      }
       else if(Math.abs(dx)<o.w/2+2&&P.h<o.hh-2&&P.inv<=0&&!e.hit&&(P.mode==='run'||P.mode==='jump'||riding())){e.hit=true;if(inCart())breakCart();else stumble();}
     }else if(e.type==='cart'){
       if(P.mode==='jump'&&!P.boots&&Math.abs(dx)<13&&P.h<15){e.dead=true;P.mode='cart';P.h=0;P.vy=0;sfx('ride');say('EN VOITURE !',.9);}
@@ -1792,11 +1803,11 @@ function draw(){
     }else if(p.b){
       /* stone block that tumbles: it turns a quarter every few frames */
       var bw2=p.b[0],bh2=p.b[1],tq=Math.floor(t*9+i)%2;if(tq){bw2=p.b[1];bh2=p.b[0];}
-      var bx2=ppx-(bw2>>1),by2=ppy-bh2+2,dk=p.c==='#d83a2e'?'#8f2020':'#8f897e';
+      var bx2=ppx-(bw2>>1),by2=ppy-bh2+2,dk=p.d||(p.c==='#d83a2e'?'#8f2020':'#8f897e');
       rect('#2b1b2e',bx2-1,by2-1,bw2+2,bh2+2);rect(p.c,bx2,by2,bw2,bh2);
       rect(dk,bx2+bw2-1,by2,1,bh2);rect(dk,bx2,by2+bh2-1,bw2,1);
-      rect(p.c==='#d83a2e'?'#f2695a':'#eee8da',bx2,by2,bw2-1,1);
-      if(bw2>4&&p.c!=='#d83a2e')rect(dk,bx2+(bw2>>1),by2+1,1,bh2-2);
+      if(!p.d)rect(p.c==='#d83a2e'?'#f2695a':'#eee8da',bx2,by2,bw2-1,1);
+      if(bw2>4&&p.c!=='#d83a2e'&&!p.d)rect(dk,bx2+(bw2>>1),by2+1,1,bh2-2);
     }else rect(p.c,ppx,ppy,2,2);
   }
   /* fox sparkles */
